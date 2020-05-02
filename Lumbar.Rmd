@@ -1,0 +1,181 @@
+---
+title: "Lumbar"
+author: "Analyzed by Anh Khoa Vo"
+date: "11/15/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# OBJECTIVE 1: Recovery of muscle strength over time!
+
+
+## Relationship of muscle strength among each time points
+
+The correlation plot of muscle strength among each time points:
+
+
+
+```{r, echo=FALSE}
+setwd("/Users/user/Documents/AK/LumbarDisc/")
+load("Global.RData")
+```
+
+
+```{r last3m, echo=FALSE, fig.keep='all', warning=FALSE}
+library(ggcorrplot)
+library(dplyr)
+Outcomes <- select(lumbar_disc_herniation, starts_with("Preop_muscle"), starts_with("Postop_muscle"))
+colnames(Outcomes)=c("Pre-op Muscle Strength","Post-op Muscle Strength","Post-op Muscle Strength 6w","Post-op Muscle Strength 3m","Post-op Muscle Strength last")
+
+Cor_outcomes <- cor(Outcomes, use = "complete.obs")
+
+Outcomes_corplot<-ggcorrplot(Cor_outcomes, type="lower", lab = TRUE)
+
+Outcomes_corplot
+```
+
+
+Our objective is to see how muscle strength changes over time. I switched wide to long format and pick only from pre-op to 3month only (as shown as the first 50 columns): 
+
+```{r, echo=FALSE}
+
+head(Lumbar_long_3mlast, 50)
+```
+
+## Slopes of recovery over time
+Next, I used lmer function to extract the "slope" of each individuals' muscle stregth over time (as shown as the first 50 individuals):
+
+(The "intercept" column stands for the estimated muscle strenght at 1st time point (preop), the "Time" column stands for the slope of muscle strength over time)
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+library(lme4)
+Lumbar_lmer <- lmer(Muscle_strength ~ Time + (1+Time|PatID), REML = FALSE, 
+                    data = Lumbar_long)
+coef_lumbar <- coef(Lumbar_lmer)$PatID[1:2]
+head(coef_lumbar, 50)
+```
+
+As you can see from the first 50 individuals from our dataset, they all have positive slope -> This indicates all of them improve over time. 
+
+To double check, we can refer to this graph below (showing the slope of recovery for the first 50 individuals):
+
+```{r, fig.keep='all', message=FALSE, warning=FALSE}
+library(reshape2)
+library(lattice)
+Lumbar_50 <- head(lumbar_disc_herniation, 50)
+Lumbar_long_50<- melt(Lumbar_50, id.vars=c("PatID", "Levels", "Age", "Gender", "Group_paresis"),
+                   measure.vars=c("Preop_muscle_strength", "Postop_muscle_strength", "Postop_muscle_strength_6w",
+                                  "Postop_muscle_strength_3m", "Postop_muscle_strength_last"),
+                   variable.name ="Time", 
+                   value.name ="Muscle_strength")
+
+Lumbar_long_50$Time <- as.numeric(Lumbar_long_50$Time)
+Lumbar_long_50$PatID<- as.factor(Lumbar_long_50$PatID)
+levels(Lumbar_long_50$PatID) <- c("1": "50")
+
+lattice_plot<-xyplot(Muscle_strength~Time|PatID, col.line = "red", layout = c(10,5),
+       grid = TRUE, type = c("p", "r"), data = Lumbar_long_50, ylab="Muscle Strength", 
+       main="Trellis Plot of Muscle Strength of the First 50 Individuals Over Time")
+
+plot(lattice_plot)
+```
+
+Now, we merge these intercepts and slope to the real data, and let the URP decide whether the recovery over time is influenced by preop muscle strenght and groups of paresis (among other variables such as age, sex, ect) (For this URP, we controlled for Bonferonni and prune the tree with maximum depth = 2):
+
+```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", message=FALSE, warning=FALSE}
+library(party)
+library(expss)
+lumbar_coef = apply_labels(lumbar_coef, Preop_muscle_strength="Pre-operation muscle strength", 
+                           Group_paresis="Groups of Paralysis",  Duration_paresis="Duration of Paralysis")
+
+URP_slope<-use_labels(lumbar_coef,ctree(Slope~Duration_initial+Myotoma+Duration_paresis+Age+Levels+Preop_muscle_strength, 
+                 data=..data,controls=ctree_control(testtype = "Bonferroni", maxdepth = 2)))
+
+plot(URP_slope, main="Decision Tree for Slope of Recovery")
+```
+
+We then extracted the mean and median out of each node from previous URP: 
+
+```{r, warning=FALSE}
+library(dplyr)
+lumbar_coef$node_slope <- party::where(URP_slope)
+lumbar_coef %>% group_by(node_slope) %>% summarise(mean=mean(Slope), median=median(Slope))
+
+lumbar_coef$node_slope2 <- as.factor(ifelse(lumbar_coef$node_slope==3,3,
+                                            ifelse(lumbar_coef$node_slope==4,4,7)))
+
+```
+
+Then plotted those in a graph: 
+```{r,  fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE }
+library(ggpubr)
+ggboxplot(data=subset(lumbar_coef, !is.na(Group_paresis3)), x="node_slope", y="Slope", fill="Group_paresis3")+
+  ylab("Slope of Recovery")+
+  facet_grid(.~Preop_muscle_strength_factor, scales = "free_x")+
+  scale_fill_manual(values=c("steelblue4", "lightblue3"))+
+  labs(fill='Timing of Surgery')+
+  theme(
+    axis.text = element_text(size=12),
+    axis.text.y = element_text(size=10),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x=element_blank())+
+  ggtitle("Association of Slope of Recovery between Muscle Strength and Time of Surgery")
+
+```
+# OBJECTIVE 2: Dichotomy of Muscle strength at 3 months
+
+As previously discussed, we would like to know how well individuals recovered at 3 months. Initially, we talked about dichotomizing the muscle strength. However, since the distance between 4 and 5 scores is **NOT** the same as the distance between 2 and 3, I decided to arrange this into 3 factors instead: severe (0-2/5), moderate (3-4/5), recovered (5/5): 
+
+```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE}
+lumbar_coef$Muscle_Factor <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_3m<3, "severe", 
+                                              ifelse(lumbar_coef$Postop_muscle_strength_3m == 5, "recovered", "moderate")))
+
+lumbar_coef$Muscle_Factor2 <- relevel(lumbar_coef$Muscle_Factor, ref = "severe")
+
+lumbar_coef_noNA <-subset(lumbar_coef, !is.na(Muscle_Factor2))
+
+URP_muscle <- use_labels(lumbar_coef_noNA, ctree(Muscle_Factor2~Preop_muscle_strength+Duration_initial+Myotoma+Duration_paresis+Age+Levels, 
+                                             data=..data, controls = ctree_control(testtype = "Bonferroni", maxdepth = 2)))
+
+plot(URP_muscle, main="Decision Tree for Muscle Groups")
+```
+
+We extracted the nodes from previous URP to plot the barplot 
+
+```{r, barplot, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center"}
+lumbar_coef_noNA$node_muscle <- party::where(URP_muscle)
+URP_muscle_node <-lumbar_coef_noNA %>% group_by(node_muscle) %>% count(Muscle_Factor2)
+URP_muscle_node$sum <- ifelse(URP_muscle_node$node_muscle==2, 74, 
+                              ifelse(URP_muscle_node$node_muscle==4,153,103)) 
+                                     
+URP_muscle_node$percent <- (URP_muscle_node$n/URP_muscle_node$sum)*100
+URP_muscle_node$Preop_muscle_strength_factor <- as.factor(ifelse(URP_muscle_node$node_muscle=="4"|URP_muscle_node$node_muscle=="5","Pre-operation muscle strength>2",
+                                                                 "Pre-operation muscle strength=<2"))
+
+URP_muscle_node$Group_paresis <- as.factor(ifelse(URP_muscle_node$node_muscle==2, "Not Significant",
+                                                  ifelse(URP_muscle_node$node_muscle==4, "=<3d", ">3d")))
+  
+
+ggplot(subset(URP_muscle_node, !(node_muscle==2)), aes(x=Muscle_Factor2, y=percent, fill=Group_paresis))+
+  geom_bar(stat="identity", position = position_dodge(width = 0.95, preserve = "total"), width = 0.94)+
+  scale_fill_manual(values=c("steelblue4", "lightblue3"))+
+  theme_bw() +
+  facet_grid(.~Preop_muscle_strength_factor, scales = "free_x")+
+  theme(axis.line = element_line(colour = "black"),
+        axis.text = element_text(size=12),
+        axis.text.x = element_text(size=10),
+        axis.text.y = element_text(size=10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  labs(title="Association between Muscle Strength and Time of Surgery", 
+       x="Groups of Muslce Strength at 3 months", y = "Percentage of Individuals", 
+       fill="Timing of Surgery")
+```
+
