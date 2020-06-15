@@ -17,8 +17,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 The correlation plot of muscle strength among each time points:
 
-
-
 ```{r, echo=FALSE}
 setwd("/Users/user/Documents/AK/LumbarDisc/")
 load("Global.RData")
@@ -38,8 +36,10 @@ Outcomes_corplot<-ggcorrplot(Cor_outcomes, type="lower", lab = TRUE)
 Outcomes_corplot
 ```
 
+Our objective is to see how muscle strength changes over time. 
+The process of transforming wide to long format and data cleaning can be accessed [here](https://github.com/AnhKhoaVo/Lumbar-Disc) 
 
-Our objective is to see how muscle strength changes over time. I switched wide to long format and pick only from pre-op to 3month only (as shown as the first 50 columns): 
+Shown below is the first 50 rows:
 
 ```{r, echo=FALSE}
 
@@ -84,7 +84,7 @@ lattice_plot<-xyplot(Muscle_strength~Time|PatID, col.line = "red", layout = c(10
 plot(lattice_plot)
 ```
 
-Now, we merge these intercepts and slope to the real data, and let the URP decide whether the recovery over time is influenced by preop muscle strenght and groups of paresis (among other variables such as age, sex, ect) (For this URP, we controlled for Bonferonni and prune the tree with maximum depth = 2):
+Now, we merge these intercepts and slope to the real data (again this data wrangling process can be accessed via github here), and let the URP decide whether the recovery over time is influenced by preop muscle strenght and groups of paresis (among other variables such as age, sex, ect) (For this URP, we controlled for Bonferonni and prune the tree with maximum depth = 2):
 
 ```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", message=FALSE, warning=FALSE}
 library(party)
@@ -179,3 +179,31 @@ ggplot(subset(URP_muscle_node, !(node_muscle==2)), aes(x=Muscle_Factor2, y=perce
        fill="Timing of Surgery")
 ```
 
+#OBJECTIVE 3: Muscle factor at last follow-up 
+
+```{r, barplot last, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center"}
+
+ggplot(Lumbar_last_factor, aes(x=Muscle_Factor_pre, y=percent, fill=Change_scores_last))+
+  geom_bar(colour="black", stat="identity", position = "stack" )+
+  scale_fill_manual(values=c("coral1", "goldenrod2", "seagreen4"))+
+  theme_bw() +
+  facet_grid(.~Group_paresis3, scales = "free_x")+
+  theme(axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(size=14, colour = "black"),
+        axis.text.y = element_text(size=14, colour = "black"),
+        legend.text=element_text(size=14),
+        legend.title = element_text(size=16),
+        legend.position="top",
+        strip.text.x = element_text(size = 14),
+        axis.title.y = element_text(size=16),
+        axis.title.x = element_text(size=16),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  geom_text(aes(label=paste0((percent))),
+            position=position_stack(vjust=0.5),size=3)+
+  labs(fill="Change of Muscle Strength at last follow up", y = "Percentage of Individuals", 
+       x="Muscle Groups Pre-operation")
+
+```
