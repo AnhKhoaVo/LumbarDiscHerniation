@@ -1,4 +1,4 @@
-library(reshape)
+library(reshape2)
 library(lattice)
 library(lme4)
 library(expss)
@@ -11,6 +11,8 @@ Lumbar_long<- melt(lumbar_disc_herniation, id.vars=c("PatID", "Levels", "Age", "
                                   "Postop_muscle_strength_3m", "Postop_muscle_strength_last"),
                    variable.name ="Time", 
                    value.name ="Muscle_strength")
+
+Lumbar_long$Time <- as.numeric(Lumbar_long$Time)
 
 #This is based on the first 50 observations only 
 Lumbar_50 <- head(lumbar_disc_herniation, 50)
