@@ -10,4 +10,4 @@ In a single-center trial, we prospectively followed a total of 390 patients with
 
 Analysis can be accessed [here](https://rpubs.com/AnhKhoaVo/Lumbar-Disc)
 
-Data cleaning process can be accesse [here](https://github.com/AnhKhoaVo/Lumbar-Disc/blob/master/Lumbar_clean.R)
+Data cleaning process can be accesse [here](https://github.com/AnhKhoaVo/LumbarDiscHerniation/blob/master/Lumbar_clean.R)
