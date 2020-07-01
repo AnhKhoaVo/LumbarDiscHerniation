@@ -4,6 +4,7 @@ library(lme4)
 library(expss)
 library(party)
 library(ggpubr)
+library(dplyr)
 
 #To perfrom LMER, I transformed wide to long data format 
 Lumbar_long<- melt(lumbar_disc_herniation, id.vars=c("PatID", "Levels", "Age", "Gender", "Group_paresis"),
