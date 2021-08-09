@@ -211,4 +211,24 @@ plot(use_labels(lumbar_coef_noNA,ctree(Slope~Duration_paresis,
                                        data=subset(..data, Preop_muscle_strength==4))), 
      main="Time of Surgery in Mild Pre-op Muscle")
 
+#Sensitivity Analysis for last follow-up 
+
+plot(use_labels(lumbar_coef_noNA,ctree(Muscle_Factor_last~Duration_paresis,
+                                       data=subset(..data, Preop_muscle_strength==4))), 
+     main="Time of Surgery in Mild Pre-op Muscle in last follow up")
+
+
+#Additional Regression
+lumbar_coef$Group_paresis4 <- as.factor(ifelse(lumbar_coef$Group_paresis3=="=<3d", "1", "0"))
+
+glm_last <- glm(Group_paresis4~Muscle_Factor_last, data=lumbar_coef, family = binomial)
+summary(glm_last)
+exp(coef(glm_last))
+
+glm_3m <- glm(Group_paresis4~Muscle_Factor3, data=lumbar_coef, family = binomial)
+summary(glm_3m)
+exp(coef(glm_3m))
+
+summary(lm(Slope~Duration_paresis, data=lumbar_coef))
+
 
