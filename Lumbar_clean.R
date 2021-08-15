@@ -92,6 +92,16 @@ lumbar_coef$Muscle_Factor2 <- relevel(lumbar_coef$Muscle_Factor, ref = "severe")
 lumbar_coef$Muscle_Factor3 <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_3m<4, "deteriorate", 
                                                ifelse(lumbar_coef$Postop_muscle_strength_3m == 5, "recovered", "unchanged")))
 
+lumbar_coef$Muscle_Factor_pre <- as.factor(ifelse(lumbar_coef$Preop_muscle_strength<3, "severe", 
+                                                  ifelse(lumbar_coef$Preop_muscle_strength == 3, "moderate", "mild")))
+
+lumbar_coef$Muscle_Factor_3m <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_3m<3, "severe", 
+                                                  ifelse(lumbar_coef$Postop_muscle_strength_3m == 3, "moderate", "mild")))
+
+
+lumbar_coef$Muscle_Factor_last <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_last<3, "severe", 
+                                                 ifelse(lumbar_coef$Postop_muscle_strength_last == 3, "moderate", "mild")))
+
 #Removing all NA in this outcome for URP: 
 lumbar_coef_noNA <-subset(lumbar_coef, !is.na(Muscle_Factor2))
 
@@ -194,8 +204,9 @@ Muscle_factor_last_barplot <-ggplot(Lumbar_last_factor, aes(x=Muscle_Factor_pre,
         panel.grid.minor = element_blank(),
         panel.border = element_blank(),
         panel.background = element_blank())+
-  geom_text(aes(label=paste0((percent))),
-            position=position_stack(vjust=0.5),size=3)+
+  geom_text(aes(label=paste0("\n", n, " (", 
+                             percent, "%)")),
+            position=position_stack(vjust=1),size=3)+
   labs(fill="Change of Muscle Strength at last follow up", y = "Percentage of Individuals", 
        x="Muscle Groups Pre-operation")
 
