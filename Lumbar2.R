@@ -98,16 +98,16 @@ colnames(coef_lumbar) <- c("PatID","Intercept", "Slope")
 
 lumbar_coef <- merge(lumbar_disc_herniation, coef_lumbar, by="PatID")
 
-lumbar_coef$Group_paresis <- as.factor(ifelse(lumbar_coef$Group_paresis=="1", "<48h(early)", 
-                                              ifelse(lumbar_coef$Group_paresis=="2" ,"2-7d(late)", "7d(very late)")))
+lumbar_coef$Group_paresis <- as.factor(ifelse(lumbar_coef$Group_paresis=="1", "<48h(ultra early)", 
+                                              ifelse(lumbar_coef$Group_paresis=="2" ,"2-7d(early)", "7d(delayed)")))
 
-lumbar_coef$Group_paresis2 <- relevel(lumbar_coef$Group_paresis, ref = "<48h(early)")
+lumbar_coef$Group_paresis2 <- relevel(lumbar_coef$Group_paresis, ref = "<48h(ultra early)")
 
 
 lumbar_coef = apply_labels(lumbar_coef, Preop_muscle_strength="Pre-operation muscle strength", 
                            Group_paresis="Groups of Paresis",  Duration_paresis="Duration of Paresis")
 
-URP_slope<-use_labels(lumbar_coef,ctree(Slope~Duration_initial+Myotoma+Duration_paresis+Age+Levels+Preop_muscle_strength+BMI+Gender, 
+URP_slope<-use_labels(lumbar_coef, party::ctree(Slope~Duration_initial+Myotoma+Duration_paresis+Age+Levels+Preop_muscle_strength+BMI+Gender, 
                  data=..data,controls=ctree_control(testtype = "Bonferroni", maxdepth = 2)))
 
 plot(URP_slope, main="Decision Tree for Slope of Recovery")
@@ -118,8 +118,10 @@ lumbar_coef$Preop_muscle_strength_factor <- as.factor(ifelse(lumbar_coef$Preop_m
 lumbar_coef$node_slope <- party::where(URP_slope)
 lumbar_coef %>% group_by(node_slope) %>% summarise(mean=mean(Slope), median=median(Slope))
 
-lumbar_coef$node_slope2 <- as.factor(ifelse(lumbar_coef$node_slope==3,3,
-                                            ifelse(lumbar_coef$node_slope==4,4,7)))
+lumbar_coef$node_slope2 <- as.factor(ifelse(lumbar_coef$node_slope==2,2,
+                                            ifelse(lumbar_coef$node_slope==4,4,5)))
+lumbar_coef$Group_paresis2 <- relevel(lumbar_coef$Group_paresis, ref = "3")
+
 
 lumbar_coef$Group_paresis3 <- as.factor(ifelse(lumbar_coef$Duration_paresis>3, ">3d", "=<3d"))
                                               
@@ -129,12 +131,32 @@ Slope_boxplot <-ggboxplot(data=subset(lumbar_coef, !is.na(Group_paresis3)), x="n
   scale_fill_manual(values=c("steelblue4", "lightblue3"))+
   labs(fill='Timing of Surgery')+
   theme(
+    axis.text = element_text(size=18),
+    axis.text.y = element_text(size=16),
+    legend.text=element_text(size=16),
+    legend.title = element_text(size=18),
+    strip.text.x = element_text(size = 16),
+    axis.title.y = element_text(size=18),
+    strip.background = element_rect(fill="grey60", colour="grey60"),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x=element_blank())
+
+  ggtitle("Association of Slope of Recovery between Muscle Strength and Time of Surgery")
+
+ggboxplot(data=subset(lumbar_coef, !is.na(Group_paresis2)), x="node_slope", y="Slope", fill="Preop_muscle_strength_factor")+
+  ylab("Slope of Recovery")+
+  facet_grid(.~Group_paresis2, scales = "free_x")+
+  scale_fill_manual(values=c("steelblue4", "lightblue3"))+
+  labs(fill='Pre-operation Muscle Strength')+
+  theme(
     axis.text = element_text(size=12),
     axis.text.y = element_text(size=10),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
     axis.title.x=element_blank())+
   ggtitle("Association of Slope of Recovery between Muscle Strength and Time of Surgery")
+
 
 ggboxplot(data=subset(lumbar_coef, node_slope==c(3, 4)), x="node_slope", y="Slope")+
   xlab("Time of Surgery")+
@@ -164,50 +186,209 @@ plot(ctree(Change_prelast~Duration_initial+Myotoma+Group_paresis+Age+Levels, dat
 lumbar_coef$Muscle_Factor <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_3m<3, "severe", 
                                               ifelse(lumbar_coef$Postop_muscle_strength_3m == 5, "recovered", "moderate")))
 
+lumbar_coef$Muscle_Factor2 <- relevel(lumbar_coef$Muscle_Factor, ref = "severe")
+
+lumbar_coef$Muscle_Factor3 <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_3m<4, "deteriorate", 
+                                               ifelse(lumbar_coef$Postop_muscle_strength_3m == 5, "recovered", "unchanged")))
+
+
 lumbar_coef_noNA <-subset(lumbar_coef, !is.na(Muscle_Factor2))
 
 URP_muscle <- use_labels(lumbar_coef_noNA, ctree(Muscle_Factor2~Preop_muscle_strength+Duration_initial+Myotoma+Duration_paresis+Age+Levels+BMI+Gender, 
                                              data=..data, controls = ctree_control(testtype = "Bonferroni", maxdepth = 2)))
 
-plot(URP_muscle, main="Decision Tree for Muscle Groups")
+plot(URP_muscle, main="Decision Tree for Muscle Groups at 3 months")
+
+# Muscle factor last 
+lumbar_coef$Muscle_Factor_last <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_last<3, "severe", 
+                                              ifelse(lumbar_coef$Postop_muscle_strength_last == 5, "recovered", "moderate")))
+
+lumbar_coef$Muscle_Factor_last <- relevel(lumbar_coef$Muscle_Factor_last, ref = "severe")
+
+lumbar_coef$Muscle_Factor_last2 <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_last<4, "deteriorate", 
+                                               ifelse(lumbar_coef$Postop_muscle_strength_last == 5, "recovered", "unchanged")))
+
+
+lumbar_coef_noNA_last <-subset(lumbar_coef, !is.na(Muscle_Factor_last))
+
+URP_muscle_last <- use_labels(lumbar_coef_noNA_last, ctree(Muscle_Factor_last~Preop_muscle_strength+Duration_initial+Myotoma+Duration_paresis+Age+Levels+BMI+Gender, 
+                                                 data=..data, controls = ctree_control(testtype = "Bonferroni")))
+
+plot(URP_muscle_last, main="Decision Tree for Muscle Groups at LAST follow-up")
 
 #the library (expss) will FUCK UP the where() function!!!!!!!!!!!
 lumbar_coef_noNA$node_muscle <- party::where(URP_muscle)
 URP_muscle_node <-lumbar_coef_noNA %>% group_by(node_muscle) %>% count(Muscle_Factor2)
 URP_muscle_node$sum <- ifelse(URP_muscle_node$node_muscle==2, 74, 
                               ifelse(URP_muscle_node$node_muscle==4,153,103)) 
-                                     
+
 URP_muscle_node$percent <- (URP_muscle_node$n/URP_muscle_node$sum)*100
 URP_muscle_node$Preop_muscle_strength_factor <- as.factor(ifelse(URP_muscle_node$node_muscle=="4"|URP_muscle_node$node_muscle=="5","Pre-operation muscle strength>2",
                                                                  "Pre-operation muscle strength=<2"))
 
 URP_muscle_node$Group_paresis <- as.factor(ifelse(URP_muscle_node$node_muscle==2, "Not Significant",
                                                   ifelse(URP_muscle_node$node_muscle==4, "=<3d", ">3d")))
-                                                                
-Muscle_barplot<-ggplot(subset(URP_muscle_node, !(node_muscle==2)), aes(x=Muscle_Factor2, y=percent, fill=Group_paresis))+
-  geom_bar(stat="identity", position = position_dodge(width = 0.95, preserve = "total"), width = 0.94)+
-  scale_fill_manual(values=c("steelblue4", "lightblue3"))+
+
+
+Muscle_barplot<-ggplot(subset(URP_muscle_node, !(node_muscle==2)), aes(x=Group_paresis, y=percent, fill=Muscle_Factor2))+
+  geom_bar(colour="black", stat="identity", position = "stack" )+
+  scale_fill_manual(values=c("darkolivegreen3", "darkseagreen4"))+
   theme_bw() +
   facet_grid(.~Preop_muscle_strength_factor, scales = "free_x")+
   theme(axis.line = element_line(colour = "black"),
-        axis.text = element_text(size=12),
-        axis.text.x = element_text(size=10),
-        axis.text.y = element_text(size=10),
+        axis.text.x = element_text(size=16, colour = "black"),
+        axis.text.y = element_text(size=16, colour = "black"),
+        legend.text=element_text(size=16),
+        legend.title = element_text(size=18),
+        strip.text.x = element_text(size = 16),
+        axis.title.y = element_text(size=18),
+        axis.title.x = element_text(size=18),
+        text=element_text(family="NimbusRom"),
+        strip.background = element_rect(fill="grey60",colour="grey60"),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  labs(fill="Groups of Muslce Strength at 3 months", y = "Percentage of Individuals", 
+       x="Timing of Surgery")
+
+#Create barplot for muscle factor at last time point
+lumbar_coef_noNA_last$node_muscle <- party::where(URP_muscle_last)
+URP_muscle_node_last <-lumbar_coef_noNA_last %>% group_by(node_muscle) %>% count(Muscle_Factor_last)
+URP_muscle_node_last$sum <- ifelse(URP_muscle_node_last$node_muscle==3, 57, 
+                              ifelse(URP_muscle_node_last$node_muscle==4,24,
+                                     ifelse(URP_muscle_node_last$node_muscle==6, 191,117)))
+
+URP_muscle_node_last$percent <- (URP_muscle_node_last$n/URP_muscle_node_last$sum)*100
+URP_muscle_node_last$Preop_muscle_strength_factor <- as.factor(ifelse(URP_muscle_node_last$node_muscle==3|URP_muscle_node_last$node_muscle==4,"Pre-operation muscle strength=<2",
+                                                                      "Pre-operation muscle strength>2"))
+
+URP_muscle_node_last$Group_paresis <- as.factor(ifelse(URP_muscle_node_last$node_muscle==6|URP_muscle_node_last$node_muscle==7, "NS",
+                                                       ifelse(URP_muscle_node_last$node_muscle==3, "=<6d", ">6d")))
+
+ggplot(subset(URP_muscle_node_last, !(Preop_muscle_strength_factor=="Pre-operation muscle strength>2")), aes(x=Group_paresis, y=percent, fill=Muscle_Factor_last))+
+  geom_bar(stat="identity", position = position_stack(), width = 0.94)+
+  scale_fill_manual(values=c("steelblue4", "lightblue3", "palegreen1"))+
+  theme_bw() +
+  facet_grid(.~Preop_muscle_strength_factor, scales = "free_x")+
+  theme(axis.line = element_line(colour = "black"),
+        axis.text = element_text(size=14),
+        axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        legend.text=element_text(size=12),
+        strip.text.x = element_text(size = 12),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         panel.border = element_blank(),
         panel.background = element_blank())+
   labs(title="Association between Muscle Strength and Time of Surgery", 
-       x="Groups of Muslce Strength at 3 months", y = "Percentage of Individuals", 
-       fill="Timing of Surgery")
+       fill="Groups of Muscle Strength at last follow-up", y = "Percentage of Individuals", 
+       x="Timing of Surgery")
+  
+
 
 ggarrange(Outcomes_corplot, ggarrange(Muscle_barplot, Slope_boxplot,labels=c("B", "C"), legend="bottom", ncol=2), nrow=2, labels="A")
 
-ggarrange(Muscle_barplot, Slope_boxplot,labels=c("A", "B"), legend="bottom", ncol=2, common.legend = TRUE)
+ggarrange(Muscle_barplot, Slope_boxplot,labels=c("A", "B"), legend="bottom", ncol=2)
 
+#Subset data to create another barplot!!!!
+Lumbar_3m <- select(lumbar_coef, "PatID", "Duration_paresis", "Group_paresis3", "Preop_muscle_strength", "Postop_muscle_strength_3m", "Postop_muscle_strength_last")
 
-lumbar_coef$Muscle_Factor2 <- relevel(lumbar_coef$Muscle_Factor, ref = "severe")
-lumbar_coef$Group_paresis2 <- relevel(lumbar_coef$Group_paresis, ref = "3")
+#3m vs last diff scores
+Lumbar_3m$Diff_scores <- Lumbar_3m$Postop_muscle_strength_3m-Lumbar_3m$Preop_muscle_strength
+
+Lumbar_3m$Diff_scores_last <- Lumbar_3m$Postop_muscle_strength_last-Lumbar_3m$Preop_muscle_strength
+
+#3m vs last change scores
+Lumbar_3m$Change_scores <- as.factor(ifelse(Lumbar_3m$Diff_scores>=1&Lumbar_3m$Postop_muscle_strength_3m==5, "recovered", 
+                                           ifelse(Lumbar_3m$Diff_scores>=1&Lumbar_3m$Postop_muscle_strength_3m==4,"improved", "unchanged")))
+
+Lumbar_3m$Change_scores_last <- as.factor(ifelse(Lumbar_3m$Diff_scores_last>=1&Lumbar_3m$Postop_muscle_strength_last==5, "recovered", 
+                                            ifelse(Lumbar_3m$Diff_scores_last>=1&Lumbar_3m$Postop_muscle_strength_last==4,"improved", "unchanged")))
+
+Lumbar_3m <- na.omit(Lumbar_3m)
+
+Lumbar_3m$Muscle_Factor_pre <- as.factor(ifelse(Lumbar_3m$Preop_muscle_strength<3, "severe", 
+                                              ifelse(Lumbar_3m$Preop_muscle_strength== 4, "mild", "moderate")))
+
+#New data to create graph for change scores of 3m 
+Lumbar_3m_factor <-Lumbar_3m %>% group_by(Group_paresis3, Muscle_Factor_pre) %>% count(Change_scores)
+
+Lumbar_3m_factor$percent <- ifelse(Lumbar_3m_factor$Group_paresis3=="=<3d"&Lumbar_3m_factor$Muscle_Factor_pre=="severe", (Lumbar_3m_factor$n/38)*100,
+                                   ifelse(Lumbar_3m_factor$Group_paresis3=="=<3d"&Lumbar_3m_factor$Muscle_Factor_pre=="mild",(Lumbar_3m_factor$n/44)*100,
+                                          ifelse(Lumbar_3m_factor$Group_paresis3=="=<3d"&Lumbar_3m_factor$Muscle_Factor_pre=="moderate", (Lumbar_3m_factor$n/109)*100,
+                                                 ifelse(Lumbar_3m_factor$Group_paresis3==">3d"&Lumbar_3m_factor$Muscle_Factor_pre=="severe", (Lumbar_3m_factor$n/36)*100,
+                                                        ifelse(Lumbar_3m_factor$Group_paresis3==">3d"&Lumbar_3m_factor$Muscle_Factor_pre=="mild", (Lumbar_3m_factor$n/36)*100, (Lumbar_3m_factor$n/67)*100
+                                                        )))))
+                                   
+Lumbar_3m_factor$percent <- round(Lumbar_3m_factor$percent, digits = 1)
+
+Lumbar_3m_factor$Change_scores <- relevel(Lumbar_3m_factor$Change_scores, ref = "unchanged")
+
+#new data to create graph for change scores at last follow up
+Lumbar_last <- subset(Lumbar_3m, !is.na(Postop_muscle_strength_last))
+
+Lumbar_last_factor <-Lumbar_last %>% group_by(Group_paresis3, Muscle_Factor_pre) %>% count(Change_scores_last)
+
+Lumbar_last_factor$percent <- ifelse(Lumbar_last_factor$Group_paresis3=="=<3d"&Lumbar_last_factor$Muscle_Factor_pre=="severe", (Lumbar_last_factor$n/41)*100,
+                                   ifelse(Lumbar_last_factor$Group_paresis3=="=<3d"&Lumbar_last_factor$Muscle_Factor_pre=="mild",(Lumbar_last_factor$n/56)*100,
+                                          ifelse(Lumbar_last_factor$Group_paresis3=="=<3d"&Lumbar_last_factor$Muscle_Factor_pre=="moderate", (Lumbar_last_factor$n/115)*100,
+                                                 ifelse(Lumbar_last_factor$Group_paresis3==">3d"&Lumbar_last_factor$Muscle_Factor_pre=="severe", (Lumbar_last_factor$n/40)*100,
+                                                        ifelse(Lumbar_last_factor$Group_paresis3==">3d"&Lumbar_last_factor$Muscle_Factor_pre=="mild", (Lumbar_last_factor$n/61)*100, (Lumbar_last_factor$n/76)*100
+                                                        )))))
+
+Lumbar_last_factor$percent <- round(Lumbar_last_factor$percent, digits = 1)
+
+Lumbar_last_factor$Change_scores_last <- relevel(Lumbar_last_factor$Change_scores_last, ref = "unchanged")
+
+#graph for 3m change scores
+ggplot(Lumbar_3m_factor, aes(x=Muscle_Factor_pre, y=percent, fill=Change_scores))+
+  geom_bar(colour="black", stat="identity", position = "stack" )+
+  scale_fill_manual(values=c("coral1", "goldenrod2", "seagreen4"))+
+  theme_bw() +
+  facet_grid(.~Group_paresis3, scales = "free_x")+
+  theme(axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(size=14, colour = "black"),
+        axis.text.y = element_text(size=14, colour = "black"),
+        legend.text=element_text(size=14),
+        legend.title = element_text(size=16),
+        legend.position="top",
+        strip.text.x = element_text(size = 14),
+        axis.title.y = element_text(size=16),
+        axis.title.x = element_text(size=16),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  geom_text(aes(label=paste0((percent))),
+            position=position_stack(vjust=0.5),size=3)+
+  labs(fill="Change of Muscle Strength at 3 months", y = "Percentage of Individuals", 
+       x="Muscle Groups Pre-operation")
+
+#graph for last follow up change scores
+ggplot(Lumbar_last_factor, aes(x=Muscle_Factor_pre, y=percent, fill=Change_scores_last))+
+  geom_bar(colour="black", stat="identity", position = "stack" )+
+  scale_fill_manual(values=c("coral1", "goldenrod2", "seagreen4"))+
+  theme_bw() +
+  facet_grid(.~Group_paresis3, scales = "free_x")+
+  theme(axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(size=14, colour = "black"),
+        axis.text.y = element_text(size=14, colour = "black"),
+        legend.text=element_text(size=14),
+        legend.title = element_text(size=16),
+        legend.position="top",
+        strip.text.x = element_text(size = 14),
+        axis.title.y = element_text(size=16),
+        axis.title.x = element_text(size=16),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank())+
+  geom_text(aes(label=paste0((percent))),
+            position=position_stack(vjust=0.5),size=3)+
+  labs(fill="Change of Muscle Strength at last follow up", y = "Percentage of Individuals", 
+       x="Muscle Groups Pre-operation")
+
 lumbar_log <- multinom(Muscle_Factor2 ~ Preop_muscle_strength + Group_paresis, data=lumbar_coef)
 summary(lumbar_log)
 
@@ -232,16 +413,18 @@ ggplot(prob_long, aes(x = Preop_muscle_strength, y = probability, colour = Group
 
 #Descriptive Stats
 library(table1)
-descrip <- table1(~as.factor(Levels)+as.factor(Gender)+Age+BMI+Preop_muscle_strength+Postop_muscle_strength_3m+Slope|Group_paresis3, data=lumbar_coef)
+descrip <- table1(~as.factor(Levels)+as.factor(Gender)+Age+BMI+Preop_muscle_strength+Muscle_Factor2+Slope+Muscle_Factor_last|Group_paresis3, data=lumbar_coef)
 write.table(descrip, file="descrip.txt")
 
 #Correlation matrix 
-Outcomes <- select(lumbar_disc_herniation, starts_with("Preop_muscle"), starts_with("Postop_muscle"))
+Lumbar_330 = filter(lumbar_coef, PatID %in% c(1:330))
+
+Outcomes <- select(Lumbar_330, starts_with("Preop_muscle"), starts_with("Postop_muscle"))
 colnames(Outcomes)=c("Pre-op Muscle Strength","Post-op Muscle Strength","Post-op Muscle Strength 6w","Post-op Muscle Strength 3m","Post-op Muscle Strength last")
 
 Cor_outcomes <- cor(Outcomes, use = "complete.obs")
 
-Outcomes_corplot<-ggcorrplot(Cor_outcomes, type="lower", lab = TRUE)
+Outcomes_corplot<-ggcorrplot(Cor_outcomes, type="lower", lab = TRUE, outline.color = "black")
 # New dataset for surgery 
 Surgery$`time of injury` <- format(as.POSIXct(Surgery$`time of injury` ,format="%H:%M:%S"),"%H:%M")
 Surgery$`Time of surgery` <- format(as.POSIXct(Surgery$`Time of surgery` ,format="%H:%M:%S"),"%H:%M")
@@ -255,7 +438,7 @@ Surgery$Time_diff_discharge <- as.numeric(difftime(Surgery$Discharge, Surgery$Ad
 
 Surgery$Time_diff_EMSCI <- as.numeric(difftime(Surgery$`Last EMSCI`, Surgery$`First EMSCI`, units="days"))
 
-Last_LEMS<-ctree(`Last LEMS`~Time_diff_surgery+Time_diff_discharge+Time_diff_EMSCI+Levels+`1_LEMS`, data=subset(Surgery, !is.na(`Last LEMS`)), controls = ctree_control(testtype = "Bonferroni"))
+Last_LEMS<-ctree(`Last LEMS`~Time_diff_surgery+Time_diff_discharge+Time_diff_EMSCI+`1_LEMS`, data=subset(Surgery, !is.na(`Last LEMS`)), controls = ctree_control(testtype = "Bonferroni"))
 plot(Last_LEMS, main="Last LEMS")
 
 Surgery$node_LEMS <- where(Last_LEMS)
@@ -278,4 +461,7 @@ plot(Last_AIS, main="Last AIS")
 
 Last_SCIM<-ctree(`Last SCIM`~Time_diff_surgery+Time_diff_discharge+Time_diff_EMSCI+Levels+`1_SCIM`, data=subset(Surgery, !is.na(`Last SCIM`)))
 plot(Last_SCIM, main="Last SCIM")
+
+
+
 

@@ -18,13 +18,14 @@ knitr::opts_chunk$set(echo = TRUE)
 The correlation plot of muscle strength among each time points:
 
 ```{r, echo=FALSE}
-setwd("/Users/user/Documents/AK/LumbarDisc/")
+setwd("/Users/giadi/Documents/AK/LumbarDisc/")
 load("Global.RData")
 ```
 
 
-```{r last3m, echo=FALSE, fig.keep='all', warning=FALSE}
+```{r last3m, echo=FALSE, fig.keep='all', warning=FALSE, message=FALSE}
 library(ggcorrplot)
+library(ggplot2)
 library(dplyr)
 Outcomes <- select(lumbar_disc_herniation, starts_with("Preop_muscle"), starts_with("Postop_muscle"))
 colnames(Outcomes)=c("Pre-op Muscle Strength","Post-op Muscle Strength","Post-op Muscle Strength 6w","Post-op Muscle Strength 3m","Post-op Muscle Strength last")
@@ -37,7 +38,7 @@ Outcomes_corplot
 ```
 
 Our objective is to see how muscle strength changes over time. 
-The process of transforming wide to long format and data cleaning can be accessed [here](https://github.com/AnhKhoaVo/Lumbar-Disc) 
+The process of transforming wide to long format and data cleaning can be accessed [here](https://github.com/AnhKhoaVo/LumbarDiscHerniation/blob/master/Lumbar_clean.R) 
 
 Shown below is the first 50 rows:
 
@@ -63,7 +64,7 @@ As you can see from the first 50 individuals from our dataset, they all have pos
 
 To double check, we can refer to this graph below (showing the slope of recovery for the first 50 individuals):
 
-```{r, fig.keep='all', message=FALSE, warning=FALSE}
+```{r, fig.keep='all', message=FALSE, warning=FALSE, echo=FALSE}
 library(reshape2)
 library(lattice)
 Lumbar_50 <- head(lumbar_disc_herniation, 50)
@@ -84,7 +85,7 @@ lattice_plot<-xyplot(Muscle_strength~Time|PatID, col.line = "red", layout = c(10
 plot(lattice_plot)
 ```
 
-Now, we merge these intercepts and slope to the real data (again this data wrangling process can be accessed via github here), and let the URP decide whether the recovery over time is influenced by preop muscle strenght and groups of paresis (among other variables such as age, sex, ect) (For this URP, we controlled for Bonferonni and prune the tree with maximum depth = 2):
+Now, we merge these intercepts and slope to the real data (again this data wrangling process can be accessed via github [here](https://github.com/AnhKhoaVo/Lumbar-Disc)), and let the URP decide whether the recovery over time is influenced by preop muscle strenght and groups of paresis (among other variables such as age, sex, ect) (For this URP, we controlled for Bonferonni and prune the tree with maximum depth = 2):
 
 ```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", message=FALSE, warning=FALSE}
 library(party)
@@ -98,9 +99,9 @@ URP_slope<-use_labels(lumbar_coef,ctree(Slope~Duration_initial+Myotoma+Duration_
 plot(URP_slope, main="Decision Tree for Slope of Recovery")
 ```
 
-We then extracted the mean and median out of each node from previous URP: 
+We then extracted the mean and median out of each node from previous URP then plotted those in a graph: 
+```{r,  fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE, echo=FALSE, message=FALSE}
 
-```{r, warning=FALSE}
 library(dplyr)
 lumbar_coef$node_slope <- party::where(URP_slope)
 lumbar_coef %>% group_by(node_slope) %>% summarise(mean=mean(Slope), median=median(Slope))
@@ -108,10 +109,6 @@ lumbar_coef %>% group_by(node_slope) %>% summarise(mean=mean(Slope), median=medi
 lumbar_coef$node_slope2 <- as.factor(ifelse(lumbar_coef$node_slope==3,3,
                                             ifelse(lumbar_coef$node_slope==4,4,7)))
 
-```
-
-Then plotted those in a graph: 
-```{r,  fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE }
 library(ggpubr)
 ggboxplot(data=subset(lumbar_coef, !is.na(Group_paresis3)), x="node_slope", y="Slope", fill="Group_paresis3")+
   ylab("Slope of Recovery")+
@@ -127,11 +124,12 @@ ggboxplot(data=subset(lumbar_coef, !is.na(Group_paresis3)), x="node_slope", y="S
   ggtitle("Association of Slope of Recovery between Muscle Strength and Time of Surgery")
 
 ```
+
 # OBJECTIVE 2: Dichotomy of Muscle strength at 3 months
 
 As previously discussed, we would like to know how well individuals recovered at 3 months. Initially, we talked about dichotomizing the muscle strength. However, since the distance between 4 and 5 scores is **NOT** the same as the distance between 2 and 3, I decided to arrange this into 3 factors instead: severe (0-2/5), moderate (3-4/5), recovered (5/5): 
 
-```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE}
+```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE, message=FALSE}
 lumbar_coef$Muscle_Factor <- as.factor(ifelse(lumbar_coef$Postop_muscle_strength_3m<3, "severe", 
                                               ifelse(lumbar_coef$Postop_muscle_strength_3m == 5, "recovered", "moderate")))
 
@@ -147,7 +145,7 @@ plot(URP_muscle, main="Decision Tree for Muscle Groups")
 
 We extracted the nodes from previous URP to plot the barplot 
 
-```{r, barplot, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center"}
+```{r, barplot, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", echo=FALSE, message=FALSE}
 lumbar_coef_noNA$node_muscle <- party::where(URP_muscle)
 URP_muscle_node <-lumbar_coef_noNA %>% group_by(node_muscle) %>% count(Muscle_Factor2)
 URP_muscle_node$sum <- ifelse(URP_muscle_node$node_muscle==2, 74, 
@@ -181,7 +179,7 @@ ggplot(subset(URP_muscle_node, !(node_muscle==2)), aes(x=Muscle_Factor2, y=perce
 
 #OBJECTIVE 3: Muscle factor at last follow-up 
 
-```{r, barplot last, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center"}
+```{r, barplot last, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", echo=FALSE}
 
 ggplot(Lumbar_last_factor, aes(x=Muscle_Factor_pre, y=percent, fill=Change_scores_last))+
   geom_bar(colour="black", stat="identity", position = "stack" )+
@@ -205,5 +203,56 @@ ggplot(Lumbar_last_factor, aes(x=Muscle_Factor_pre, y=percent, fill=Change_score
             position=position_stack(vjust=0.5),size=3)+
   labs(fill="Change of Muscle Strength at last follow up", y = "Percentage of Individuals", 
        x="Muscle Groups Pre-operation")
+```
+
+# Sensitivity Analysis (Outcomes for only pre-op muscle of 4)
+
+```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE}
+
+plot(use_labels(lumbar_coef_noNA,ctree(Muscle_Factor3~Duration_paresis,
+                                       data=subset(..data, Preop_muscle_strength==4))), 
+     main="Time of Surgery in Mild Pre-op Muscle")
+```
+
+```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE}
+
+plot(use_labels(lumbar_coef_noNA,ctree(Slope~Duration_paresis,
+                                       data=subset(..data, Preop_muscle_strength==4))), 
+     main="Time of Surgery in Mild Pre-op Muscle")
+```
+
+# Sensitivity Analysis for last follow-up 
+
+```{r, fig.keep='all', fig.height = 8, fig.width = 15, fig.align = "center", warning=FALSE}
+
+plot(use_labels(lumbar_coef_noNA,ctree(Muscle_Factor_last~Duration_paresis,
+                                       data=subset(..data, Preop_muscle_strength==4))), 
+     main="Time of Surgery in Mild Pre-op Muscle in last follow up")
+```
+
+# Additional regession analyses
+
+```{r, echo=FALSE, fig.keep='all', warning=FALSE, message=FALSE}
+lumbar_coef$Group_paresis4 <- as.factor(ifelse(lumbar_coef$Group_paresis3=="=<3d", "1", "0"))
+
+glm_last <- glm(Group_paresis4~Muscle_Factor_last, data=lumbar_coef, family = binomial)
+summary(glm_last)
+exp(coef(glm_last))
 
 ```
+
+This result indicates that the odds of earlier surgery for muscle recovered at last time point is 44% compared to later time point.   
+
+```{r, echo=FALSE, fig.keep='all', warning=FALSE, message=FALSE}
+glm_3m <- glm(Group_paresis4~Muscle_Factor3, data=lumbar_coef, family = binomial)
+summary(glm_3m)
+exp(coef(glm_3m))
+```
+
+Similarly, this indicates that the odds of earlier surgery for muscle recovered at 3m time point is 28.5 times the odds of later surgery. 
+
+```{r, echo=FALSE, fig.keep='all', warning=FALSE, message=FALSE}
+summary(lm(Slope~Duration_paresis, data=lumbar_coef))
+```
+
+This also shows that the earlier the sugery, the better for the slope of outcome. 
